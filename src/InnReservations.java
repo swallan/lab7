@@ -24,7 +24,7 @@ public class InnReservations {
   public static final String HP_JDBC_USER = "HP_JDBC_USER";
   public static final String HP_JDBC_PW = "HP_JDBC_PW";
 
-  private static void bookReservation() throws SQLException {
+  private static void bookReservation(BufferedReader reader) throws SQLException {
     /*
     When this option is selected, your system shall accept from the user the
     following information:
@@ -37,8 +37,8 @@ public class InnReservations {
     • Number of children
     • Number of adults
     */
-    try (var s = new Scanner(System.in)) {
-      ReservationDetails rDetails = takeReservationDetails(s);
+//    try  {
+      ReservationDetails rDetails = takeReservationDetails(reader);
       List<Room> rooms = getPossibleRooms(rDetails);
 
       if (rooms.isEmpty()) {
@@ -52,9 +52,9 @@ public class InnReservations {
             System.out.println(r);
           }
           System.out.println("Input room code to book one, or type `CANCEL` to cancel.");
-          String code = s.nextLine();
+          String code = getResponse(reader);
           if(!code.equals("CANCEL")) {
-            makeProspectiveBooking(rDetails, code, s);
+            makeProspectiveBooking(rDetails, code, reader);
           }
           // TODO:
           // - need to find similar possible bookings.
@@ -66,12 +66,12 @@ public class InnReservations {
           System.out.println(String.format("%s | %s", r.roomCode, r.roomName));
         }
         System.out.println("Input room code to book one, or type `CANCEL` to cancel.");
-        String code = s.nextLine();
+        String code = getResponse(reader);
         if(!code.equals("CANCEL")) {
-          makeProspectiveBooking(rDetails, code, s);
+          makeProspectiveBooking(rDetails, code, reader);
         }
       }
-    }
+//    }
   }
 
 
@@ -100,10 +100,6 @@ public class InnReservations {
              ResultSet rs = stmt.executeQuery(sql)) {
           while (rs.next() && rooms.size() < 5) {
             rooms.add(String.format("%s | %s from %s to %s",rs.getString("roomCode"), rs.getString("roomName"), df.format(checkin), df.format(checkout)));
-
-
-//                Room.builder().roomCode(rs.getString("roomCode"))
-//            .roomName(rs.getString("roomName")))//new Room(rs.getString("roomCode"), rs.getString("roomName"), ));
           }
         }
       }
@@ -132,7 +128,7 @@ public class InnReservations {
     return true;
   }
 
-  private static void makeProspectiveBooking(ReservationDetails rDetails, String code, Scanner s) throws SQLException {
+  private static void makeProspectiveBooking(ReservationDetails rDetails, String code, BufferedReader reader) throws SQLException {
     try (Connection conn = DriverManager.getConnection(System.getenv(HP_JDBC_URL),
         System.getenv(HP_JDBC_USER),
         System.getenv(HP_JDBC_PW))) {
@@ -159,7 +155,7 @@ public class InnReservations {
           basePrice = rs.getLong("basePrice");
         }
       }
-      String input = s.nextLine();
+      String input = getResponse(reader);
       if (input.equals("C")) {
         String sql = String.format("insert into lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids) VALUES  (%s, '%s','%s','%s', %s, '%s', '%s', %s, %s)", newCode, code, rDetails.checkin, rDetails.checkout, basePrice, rDetails.firstName, rDetails.lastName, rDetails.nadults, rDetails.nchildren);
         try (Statement stmt = conn.createStatement()
@@ -167,6 +163,7 @@ public class InnReservations {
           int rs = stmt.executeUpdate(sql);
         }
         System.out.println("Thank you for booking.");
+        System.out.print(String.format("Your reservation code is: <%s>", newCode));
       } else{
         System.out.println("Booking aborted.");
       }
@@ -219,26 +216,26 @@ public class InnReservations {
   }
 
 
-  private static ReservationDetails takeReservationDetails(Scanner s) {
-//     return new ReservationDetails("firstName", "lastName", "Any",
-//         "Any", "2021-10-20", "2021-10-25", 1, 1);
-   System.out.println("Input first name");
-   String firstName = s.nextLine();
-   System.out.println("Input last name");
-   String lastName = s.nextLine();
-   System.out.println("Input room code if preference, else 'Any'");
-   String roomCode = s.nextLine();
-   System.out.println("Input bed type if preference, else 'Any'");
-   String bedType = s.nextLine();
-   System.out.println("Input checkin date (mm-dd-yyyy)");
-   String checkin = s.nextLine();
-   System.out.println("Input checkout date (mm-dd-yyyy)");
-   String checkout = s.nextLine();
-   System.out.println("Input count children (1, 2, ...)");
-   int nchildren = Integer.parseInt(s.nextLine());
-   System.out.println("Input count adults (1, 2, ...)");
-   int nadults = Integer.parseInt(s.nextLine());
-   return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
+  private static ReservationDetails takeReservationDetails(BufferedReader s) {
+     return new ReservationDetails("firstName", "lastName", "Any",
+         "Any", "2021-10-20", "2021-10-25", 1, 1);
+//   System.out.println("Input first name");
+//   String firstName = s.nextLine();
+//   System.out.println("Input last name");
+//   String lastName = s.nextLine();
+//   System.out.println("Input room code if preference, else 'Any'");
+//   String roomCode = s.nextLine();
+//   System.out.println("Input bed type if preference, else 'Any'");
+//   String bedType = s.nextLine();
+//   System.out.println("Input checkin date (mm-dd-yyyy)");
+//   String checkin = s.nextLine();
+//   System.out.println("Input checkout date (mm-dd-yyyy)");
+//   String checkout = s.nextLine();
+//   System.out.println("Input count children (1, 2, ...)");
+//   int nchildren = Integer.parseInt(s.nextLine());
+//   System.out.println("Input count adults (1, 2, ...)");
+//   int nadults = Integer.parseInt(s.nextLine());
+//   return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
   }
 
 
@@ -251,8 +248,7 @@ public class InnReservations {
       System.exit(-1);
     }
 
-// This Will start process to book reservation.
-//     bookReservation();
+
 
 
     try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
@@ -317,21 +313,26 @@ public class InnReservations {
             """);
           String response = getResponse(reader);
           while (response.charAt(0) != '0') {
+
             switch (response.charAt(0)) {
               case '1':
                 roomsAndReservations(stmt);
                 break;
               case '2':
+                // This Will start process to book reservation.
+                bookReservation(reader);
                 break;
               case '3':
                 break;
               case '4':
+                deleteReservation(reader);
                 break;
               case '5':
                 break;
               case '6':
                 break;
             }
+            System.out.println("Main Menu.");
             response = getResponse(reader);
           }
         } catch (IOException e) {
@@ -345,6 +346,41 @@ public class InnReservations {
     }
 
   }
+
+  private static void deleteReservation(BufferedReader reader) throws SQLException {
+    System.out.println("Please enter your confirmation code for cancellation.");
+    String code = getResponse(reader);
+    System.out.println(String.format("Please confirm [C] cancellation for <%s>.\nPress any other key to keep your reservation.", code));
+    if (getResponse(reader).equals("C")){
+      // cancel reservation
+      String sql = String.format("delete from lab7_reservations where CODE = %s", code);
+      String sql2 = String.format("select * from lab7_reservations where CODE = %s", code);
+      try (Connection conn = DriverManager.getConnection(System.getenv(HP_JDBC_URL),
+          System.getenv(HP_JDBC_USER),
+          System.getenv(HP_JDBC_PW))) {
+        boolean isR = false;
+        try (Statement stmt = conn.createStatement()) {
+          ResultSet rs = stmt.executeQuery(sql2);
+          while(rs.next()) {
+            isR = true;
+          }
+        }
+        if (!isR) {
+          System.out.println("Invalid reservation code. Returning to main menu.");
+          return;
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+          int rs = stmt.executeUpdate(sql);
+        }
+        System.out.println("cancellation successful.");
+      }
+    } else {
+      System.out.println("Reservation kept.");
+    }
+
+  }
+
   private static void roomsAndReservations(Statement stmt) throws SQLException {
     String fr1 =
       """
