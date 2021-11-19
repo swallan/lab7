@@ -1,3 +1,4 @@
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -8,6 +9,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+
+import java.sql.*;
+
 
 public class InnReservations {
 
@@ -213,25 +217,25 @@ public class InnReservations {
 
 
   private static ReservationDetails takeReservationDetails(Scanner s) {
-    return new ReservationDetails("firstName", "lastName", "Any",
-        "Any", "2021-10-20", "2021-10-25", 1, 1);
-//    System.out.println("Input first name");
-//    String firstName = s.nextLine();
-//    System.out.println("Input last name");
-//    String lastName = s.nextLine();
-//    System.out.println("Input room code if preference, else 'Any'");
-//    String roomCode = s.nextLine();
-//    System.out.println("Input bed type if preference, else 'Any'");
-//    String bedType = s.nextLine();
-//    System.out.println("Input checkin date (mm-dd-yyyy)");
-//    String checkin = s.nextLine();
-//    System.out.println("Input checkout date (mm-dd-yyyy)");
-//    String checkout = s.nextLine();
-//    System.out.println("Input count children (1, 2, ...)");
-//    int nchildren = Integer.parseInt(s.nextLine());
-//    System.out.println("Input count adults (1, 2, ...)");
-//    int nadults = Integer.parseInt(s.nextLine());
-//    return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
+//     return new ReservationDetails("firstName", "lastName", "Any",
+//         "Any", "2021-10-20", "2021-10-25", 1, 1);
+   System.out.println("Input first name");
+   String firstName = s.nextLine();
+   System.out.println("Input last name");
+   String lastName = s.nextLine();
+   System.out.println("Input room code if preference, else 'Any'");
+   String roomCode = s.nextLine();
+   System.out.println("Input bed type if preference, else 'Any'");
+   String bedType = s.nextLine();
+   System.out.println("Input checkin date (mm-dd-yyyy)");
+   String checkin = s.nextLine();
+   System.out.println("Input checkout date (mm-dd-yyyy)");
+   String checkout = s.nextLine();
+   System.out.println("Input count children (1, 2, ...)");
+   int nchildren = Integer.parseInt(s.nextLine());
+   System.out.println("Input count adults (1, 2, ...)");
+   int nadults = Integer.parseInt(s.nextLine());
+   return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
   }
 
 
@@ -243,29 +247,65 @@ public class InnReservations {
       System.err.println("Unable to load JDBC Driver");
       System.exit(-1);
     }
-    bookReservation();
-//    try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
-//          System.getenv("HP_JDBC_USER"),
-//          System.getenv("HP_JDBC_PW"))) {
-//      System.out.println("CONNECTION SUCCESS");
-//
-//      // Step 2: Construct SQL statement
-//      String sql = "SELECT * FROM lab7_rooms";
-//
-//      // Step 3: (omitted in this example) Start transaction
-//
-//      // Step 4: Send SQL statement to DBMS
-//      try (Statement stmt = conn.createStatement();
-//           ResultSet rs = stmt.executeQuery(sql)) {
-//        // Step 5: Receive results
-//        while (rs.next()) {
-//          String roomCode = rs.getString("RoomCode");
-//          String roomName = rs.getString("RoomName");
-//          System.out.format("Roomcode: %s Roomname: %s\n", roomCode, roomName);
-//        }
-//      }
-//    } catch (SQLException e) {
-//      System.out.println("CONNECTION FAILURE");
-//    }
+
+// This Will start process to book reservation.
+//     bookReservation();
+
+
+    try (Connection conn = DriverManager.getConnection(System.getenv("HP_JDBC_URL"),
+      System.getenv("HP_JDBC_USER"),
+      System.getenv("HP_JDBC_PW"))) {
+      System.out.println("CONNECTION SUCCESS");
+
+        String createRooms =
+          """
+              CREATE TABLE IF NOT EXISTS swallan.lab7_rooms (
+                RoomCode char(5) PRIMARY KEY,
+                RoomName varchar(30) NOT NULL,
+                Beds int(11) NOT NULL,
+                bedType varchar(8) NOT NULL,
+                maxOcc int(11) NOT NULL,
+                basePrice DECIMAL(6,2) NOT NULL,
+                decor varchar(20) NOT NULL,
+                UNIQUE (RoomName)
+              );
+            """;
+        String createReservations =
+          """
+          CREATE TABLE IF NOT EXISTS swallan.lab7_reservations (
+            CODE int(11) PRIMARY KEY,
+            Room char(5) NOT NULL,
+            CheckIn date NOT NULL,
+            Checkout date NOT NULL,
+            Rate DECIMAL(6,2) NOT NULL,
+            LastName varchar(15) NOT NULL,
+            FirstName varchar(15) NOT NULL,
+            Adults int(11) NOT NULL,
+            Kids int(11) NOT NULL,
+            FOREIGN KEY (Room) REFERENCES swallan.lab7_rooms (RoomCode)
+            );
+          """;
+        // It errors cuz of duplicate keys so only need this if we need to reset the tables
+//        String insertRooms = "INSERT INTO swallan.lab7_rooms SELECT * FROM INN.rooms;";
+//        String insertReservations =
+//          """
+//          INSERT INTO swallan.lab7_reservations SELECT CODE, Room,
+//          DATE_ADD(CheckIn, INTERVAL 132 MONTH),
+//          DATE_ADD(Checkout, INTERVAL 132 MONTH),
+//          Rate, LastName, FirstName, Adults, Kids FROM INN.reservations;
+//          """;
+
+      try (Statement stmt = conn.createStatement()) {
+        stmt.execute(createRooms);
+        stmt.execute(createReservations);
+
+
+      } catch (SQLException e) {
+        System.out.println("Unable to execute query:\n" + e.getMessage());
+      }
+    } catch (SQLException e) {
+      System.out.println("CONNECTION FAILURE");
+    }
+
   }
 }
