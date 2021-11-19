@@ -1,4 +1,7 @@
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -298,7 +301,42 @@ public class InnReservations {
       try (Statement stmt = conn.createStatement()) {
         stmt.execute(createRooms);
         stmt.execute(createReservations);
-        roomsAndReservations(stmt);
+
+        try (var reader = new BufferedReader(new InputStreamReader(System.in))) {
+          System.out.println("CSC 365 Lab 7\nBy Fin and Sam\n");
+
+          System.out.println("""
+            Enter a number
+            1: Rooms and Reservations
+            2: Reservations
+            3: Reservation Change
+            4: Reservation Cancellation
+            5: Detailed Reservation Information
+            6: Revenue
+            0: Exit
+            """);
+          String response = getResponse(reader);
+          while (response.charAt(0) != '0') {
+            switch (response.charAt(0)) {
+              case '1':
+                roomsAndReservations(stmt);
+                break;
+              case '2':
+                break;
+              case '3':
+                break;
+              case '4':
+                break;
+              case '5':
+                break;
+              case '6':
+                break;
+            }
+            response = getResponse(reader);
+          }
+        } catch (IOException e) {
+          System.out.println("Error initiating reader.");
+        }
       } catch (SQLException e) {
         System.out.println("Unable to execute query:\n" + e.getMessage());
       }
@@ -343,6 +381,14 @@ public class InnReservations {
       System.out.format("RoomCode: %s, RoomName: %s, Beds: %s, bedType: %s, maxOcc: %s, basePrice: %s, decor: %s, " +
         "latestCheckout: %s, popularity: %s, NextAvailable: %s\n", code, name, beds, bedType, maxOcc, basePrice,
         decor, latestCheckout, popularity, nextAvail);
+    }
+  }
+  private static String getResponse(final BufferedReader reader) {
+    try {
+      return reader.readLine();
+    } catch (IOException e) {
+      e.printStackTrace();
+      return e.getLocalizedMessage();
     }
   }
 }
