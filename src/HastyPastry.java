@@ -109,7 +109,6 @@ public class HastyPastry {
 							   System.getenv("HP_JDBC_PW"))) {
 	    // Step 2: Construct SQL statement
 	    String sql = "show tables";
-		System.out.println("do something");
 
 	    // Step 3: (omitted in this example) Start transaction
 
