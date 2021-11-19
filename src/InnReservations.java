@@ -100,10 +100,6 @@ public class InnReservations {
              ResultSet rs = stmt.executeQuery(sql)) {
           while (rs.next() && rooms.size() < 5) {
             rooms.add(String.format("%s | %s from %s to %s",rs.getString("roomCode"), rs.getString("roomName"), df.format(checkin), df.format(checkout)));
-
-
-//                Room.builder().roomCode(rs.getString("roomCode"))
-//            .roomName(rs.getString("roomName")))//new Room(rs.getString("roomCode"), rs.getString("roomName"), ));
           }
         }
       }
@@ -317,6 +313,7 @@ public class InnReservations {
             """);
           String response = getResponse(reader);
           while (response.charAt(0) != '0') {
+
             switch (response.charAt(0)) {
               case '1':
                 roomsAndReservations(stmt);
@@ -328,12 +325,14 @@ public class InnReservations {
               case '3':
                 break;
               case '4':
+                deleteReservation(reader);
                 break;
               case '5':
                 break;
               case '6':
                 break;
             }
+            System.out.println("Main Menu.");
             response = getResponse(reader);
           }
         } catch (IOException e) {
@@ -347,6 +346,41 @@ public class InnReservations {
     }
 
   }
+
+  private static void deleteReservation(BufferedReader reader) throws SQLException {
+    System.out.println("Please enter your confirmation code for cancellation.");
+    String code = getResponse(reader);
+    System.out.println(String.format("Please confirm [C] cancellation for <%s>.\nPress any other key to keep your reservation.", code));
+    if (getResponse(reader).equals("C")){
+      // cancel reservation
+      String sql = String.format("delete from lab7_reservations where CODE = %s", code);
+      String sql2 = String.format("select * from lab7_reservations where CODE = %s", code);
+      try (Connection conn = DriverManager.getConnection(System.getenv(HP_JDBC_URL),
+          System.getenv(HP_JDBC_USER),
+          System.getenv(HP_JDBC_PW))) {
+        boolean isR = false;
+        try (Statement stmt = conn.createStatement()) {
+          ResultSet rs = stmt.executeQuery(sql2);
+          while(rs.next()) {
+            isR = true;
+          }
+        }
+        if (!isR) {
+          System.out.println("Invalid reservation code. Returning to main menu.");
+          return;
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+          int rs = stmt.executeUpdate(sql);
+        }
+        System.out.println("cancellation successful.");
+      }
+    } else {
+      System.out.println("Reservation kept.");
+    }
+
+  }
+
   private static void roomsAndReservations(Statement stmt) throws SQLException {
     String fr1 =
       """
