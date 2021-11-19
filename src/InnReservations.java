@@ -2,6 +2,7 @@
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -23,6 +24,7 @@ public class InnReservations {
   public static final String HP_JDBC_URL = "HP_JDBC_URL";
   public static final String HP_JDBC_USER = "HP_JDBC_USER";
   public static final String HP_JDBC_PW = "HP_JDBC_PW";
+  public static final String NO_CHANGE = "no change";
 
   private static void bookReservation() throws SQLException {
     /*
@@ -170,9 +172,6 @@ public class InnReservations {
       } else{
         System.out.println("Booking aborted.");
       }
-
-
-
     }
   }
 
@@ -241,6 +240,139 @@ public class InnReservations {
    return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
   }
 
+  private static void changeReservation(Connection conn, Scanner s) throws SQLException {
+    try (PreparedStatement pstmt2 = conn.prepareStatement("""
+  select Room from swallan.lab7_reservations where CODE = ?
+""")) {
+
+      System.out.println("Input 'no change' for any field you do not wish to change\n");
+      System.out.println("Enter reservation code");
+      String resCode = s.nextLine();
+      pstmt2.setString(1, resCode);
+      ResultSet rs = pstmt2.executeQuery();
+      rs.next();
+      String room = rs.getString("Room");
+
+      System.out.println("Enter first name");
+      String fName = s.nextLine();
+      if (!fName.equals(NO_CHANGE)) {
+        PreparedStatement pstmt = conn.prepareStatement
+          ("""
+        UPDATE swallan.lab7_reservations
+        SET FirstName = ?
+        WHERE CODE = ?
+        """);
+        pstmt.setString(1, fName);
+        pstmt.setInt(2, Integer.parseInt(resCode));
+        pstmt.executeUpdate();
+      }
+      System.out.println("Enter last name");
+      String lName = s.nextLine();
+      if (!lName.equals(NO_CHANGE)) {
+        PreparedStatement pstmt = conn.prepareStatement
+          ("""
+        UPDATE swallan.lab7_reservations
+        SET LastName = ?
+        WHERE CODE = ?
+        """);
+        pstmt.setString(1, lName);
+        pstmt.setInt(2, Integer.parseInt(resCode));
+        pstmt.executeUpdate();
+      }
+      System.out.println("Enter begin date (yyyy-mm-dd)");
+      String checkin = s.nextLine();
+      if (!checkin.equals(NO_CHANGE)) {
+        if (checkDate(conn, checkin, room)) {
+          PreparedStatement pstmt = conn.prepareStatement
+            ("""
+        UPDATE swallan.lab7_reservations
+        SET CheckIn = ?
+        WHERE CODE = ?
+        """);
+          pstmt.setDate(1, Date.valueOf(checkin));
+          pstmt.setInt(2, Integer.parseInt(resCode));
+          pstmt.executeUpdate();
+        } else {
+          System.err.println("Unable to update checkin date, it lands within another reservation.");
+        }
+      }
+      System.out.println("Enter end date (yyyy-mm-dd)");
+      String checkout = s.nextLine();
+      if (!checkout.equals(NO_CHANGE)) {
+        if (checkDate(conn, checkout, room)) {
+          PreparedStatement pstmt = conn.prepareStatement
+            ("""
+        UPDATE swallan.lab7_reservations
+        SET CheckOut = ?
+        WHERE CODE = ?
+        """);
+          pstmt.setDate(1, Date.valueOf(checkout));
+          pstmt.setInt(2, Integer.parseInt(resCode));
+          pstmt.executeUpdate();
+        }else {
+          System.err.println("Unable to update checkout date, it lands within another reservation.");
+        }
+      }
+      System.out.println("Enter number of children");
+      String numChildren = s.nextLine();
+      if (!numChildren.equals(NO_CHANGE)) {
+        PreparedStatement pstmt = conn.prepareStatement
+          ("""
+        UPDATE swallan.lab7_reservations
+        SET Kids = ?
+        WHERE CODE = ?
+        """);
+        pstmt.setInt(1, Integer.parseInt(numChildren));
+        pstmt.setInt(2, Integer.parseInt(resCode));
+        pstmt.executeUpdate();
+      }
+      System.out.println("Enter number of adults");
+      String numAdults = s.nextLine();
+      if (!numAdults.equals(NO_CHANGE)) {
+        PreparedStatement pstmt = conn.prepareStatement
+          ("""
+        UPDATE swallan.lab7_reservations
+        SET Adults = ?
+        WHERE CODE = ?
+        """);
+        pstmt.setInt(1, Integer.parseInt(numAdults));
+        pstmt.setInt(2, Integer.parseInt(resCode));
+        pstmt.executeUpdate();
+      }
+    }
+  }
+
+  /**
+   * Checks if a date will land within an existing stays checkin and checkout range
+   * @param conn
+   * @param date
+   * @param room
+   * @return True if no problem, false if the new date will be in another range in the same room
+   * @throws SQLException
+   */
+  private static boolean checkDate(Connection conn, String date, String room) throws SQLException {
+    PreparedStatement pstmt =
+      conn.prepareStatement("""
+      select * from swallan.lab7_reservations where checkin <= ? and checkout > ? and room = ?
+      """);
+    pstmt.setDate(1, java.sql.Date.valueOf(date));
+    pstmt.setDate(2, java.sql.Date.valueOf(date));
+    pstmt.setString(3, room);
+    ResultSet rs = pstmt.executeQuery();
+    int size =0;
+    if (rs != null)
+    {
+      boolean check = rs.last();    // moves cursor to the last row
+      if (check) {
+        size = rs.getRow(); // get row id
+      }
+    }
+    if (size == 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
 
   public static void main(String[] args) throws SQLException {
     try{
@@ -322,6 +454,7 @@ public class InnReservations {
                 roomsAndReservations(stmt);
                 break;
               case '2':
+                changeReservation(conn,new Scanner(System.in));
                 break;
               case '3':
                 break;
@@ -338,7 +471,8 @@ public class InnReservations {
           System.out.println("Error initiating reader.");
         }
       } catch (SQLException e) {
-        System.out.println("Unable to execute query:\n" + e.getMessage());
+        System.out.println("Unable to execute query:\n" + e.getLocalizedMessage());
+        e.printStackTrace();
       }
     } catch (SQLException e) {
       System.out.println("CONNECTION FAILURE");
@@ -383,6 +517,7 @@ public class InnReservations {
         decor, latestCheckout, popularity, nextAvail);
     }
   }
+
   private static String getResponse(final BufferedReader reader) {
     try {
       return reader.readLine();
