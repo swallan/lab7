@@ -11,7 +11,10 @@ import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 import java.sql.*;
@@ -217,7 +220,7 @@ public class InnReservations {
 
   private static ReservationDetails takeReservationDetails(BufferedReader s) {
      return new ReservationDetails("firstName", "lastName", "Any",
-         "Any", "2021-10-20", "2021-10-25", 1, 1);
+         "Any", "2021-10-20", "2021-12-25", 1, 1);
 //   System.out.println("Input first name");
 //   String firstName = s.nextLine();
 //   System.out.println("Input last name");
@@ -462,6 +465,7 @@ public class InnReservations {
               case '5':
                 break;
               case '6':
+                showRevenue();
                 break;
             }
             System.out.println("Main Menu.");
@@ -480,7 +484,67 @@ public class InnReservations {
 
   }
 
-  private static void deleteReservation(BufferedReader reader) throws SQLException {
+  private static void showRevenue() {
+
+    String sql = """
+        with funStuff as (select *,
+               IF(MONTH(CheckIn) = MONTH(Checkout),
+                    DATEDIFF(checkout, checkin), -- just the number of days in the reservation
+                    if (MONTH(CheckOut) <> m and MONTH(Checkin) <> m,
+                        DAY(LAST_DAY(DATE_ADD(MAKEDATE(2008, 7), INTERVAL (m - 1) MONTH))), -- full month
+                        -- partial month
+                        IF(MONTH(checkout) = m,
+                           DAY(checkout),
+                           DAY(LAST_DAY(DATE_ADD(MAKEDATE(2008, 7), INTERVAL (m - 1) MONTH))) +1 - DAY(checkin)
+                          )
+                       )
+                  ) as daysStayed
+                
+        from lab7_reservations join months on (MONTH(CheckIn) <= months.m and MONTH(Checkout) >= months.m)
+        where MONTH(Checkout) <> MONTH(Checkin)
+        order by CODE DESC)
+                
+        select m, sum(daysStayed * rate) as money, room from funStuff
+        group by m, room
+        order by m, room""";
+
+    Map<String, List<Double>> roomsAndRevenues = new HashMap<>();
+    try (Connection conn = DriverManager.getConnection(System.getenv(HP_JDBC_URL),
+        System.getenv(HP_JDBC_USER),
+        System.getenv(HP_JDBC_PW))) {
+      boolean isR = false;
+      try (Statement stmt = conn.createStatement()) {
+        ResultSet rs = stmt.executeQuery(sql);
+        while (rs.next()) {
+          if (roomsAndRevenues.containsKey(rs.getString("room"))) {
+            roomsAndRevenues.get(rs.getString("room")).add(Double.parseDouble(rs.getString("money")));
+          } else {
+            List<Double> temp = new ArrayList<>();
+            temp.add(Double.parseDouble(rs.getString("money")));
+
+            roomsAndRevenues.put(rs.getString("room"), temp);
+          }
+        }
+      }
+      System.out.println("Showing revenue for each room, by month.");
+      for (Map.Entry<String, List<Double>> e : roomsAndRevenues.entrySet()) {
+        System.out.println(String.format("Revenue for room %s", e.getKey()));
+        for (int i = 1; i < 13; i++) {
+          double rev = 0;
+          if (e.getValue().size() > i) {
+            rev = e.getValue().get(i);
+          }
+          System.out.println(String.format("Month %s: %s", i, Math.round(rev)));
+
+        }
+        System.out.println(String.format("Total revenue: %s\n", Math.round(e.getValue().stream().mapToDouble(f -> f.doubleValue()).sum())));
+      }
+    } catch (SQLException throwables) {
+      throwables.printStackTrace();
+    }
+  }
+
+    private static void deleteReservation(BufferedReader reader) throws SQLException {
     System.out.println("Please enter your confirmation code for cancellation.");
     String code = getResponse(reader);
     System.out.println(String.format("Please confirm [C] cancellation for <%s>.\nPress any other key to keep your reservation.", code));
