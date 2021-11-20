@@ -389,6 +389,107 @@ public class InnReservations {
     }
   }
 
+  private static void detailedResInformation(Connection conn, Scanner scanner) throws SQLException {
+    PreparedStatement pstmt = conn.prepareStatement(
+"""
+    select CODE, RoomName, Room, CheckIn, CheckOut, Rate, LastName, FirstName, Adults, Kids from
+     swallan.lab7_reservations as r
+         join swallan.lab7_rooms as r2 on Room = RoomCode
+      WHERE FirstName LIKE ? and LastName LIKE ? and Room LIKE ? and code LIKE ?
+      and ((? <= CheckIn and CheckIn <= ?) or (? <= CheckOut and CheckOut <= ?))
+    """);
+    PreparedStatement pstmtRightBoundOnly = conn.prepareStatement(
+      """
+          select CODE, RoomName, Room, CheckIn, CheckOut, Rate, LastName, FirstName, Adults, Kids from
+           swallan.lab7_reservations as r
+               join swallan.lab7_rooms as r2 on Room = RoomCode
+            WHERE FirstName LIKE ? and LastName LIKE ? and Room LIKE ? and code LIKE ?
+            and (CheckIn <= ? or CheckOut <= ?)
+          """);
+    PreparedStatement pstmtLeftBoundOnly = conn.prepareStatement(
+      """
+          select CODE, RoomName, Room, CheckIn, CheckOut, Rate, LastName, FirstName, Adults, Kids from
+           swallan.lab7_reservations as r
+               join swallan.lab7_rooms as r2 on Room = RoomCode
+            WHERE FirstName LIKE ? and LastName LIKE ? and Room LIKE ? and code LIKE ?
+            and (? <= CheckIn or ? <= CheckOut)
+          """);
+    PreparedStatement pstmtNoDates = conn.prepareStatement(
+      """
+          select CODE, RoomName, Room, CheckIn, CheckOut, Rate, LastName, FirstName, Adults, Kids from
+           swallan.lab7_reservations as r
+               join swallan.lab7_rooms as r2 on Room = RoomCode
+            WHERE FirstName LIKE ? and LastName LIKE ? and Room LIKE ? and code LIKE ?
+          """);
+    System.out.println("Input information to query reservations. Blank entry will indicate any\n");
+    System.out.println("Enter firstname");
+    String fname = scanner.nextLine();
+    System.out.println("Enter last name");
+    String lname = scanner.nextLine();
+    System.out.println("Enter a room code");
+    String room = scanner.nextLine();
+    System.out.println("Enter date range left bound");
+    String firstDate = scanner.nextLine();
+    System.out.println("Enter date range right bound");
+    String lastDate = scanner.nextLine();
+    System.out.println("Enter reservation code");
+    String resCode = scanner.nextLine();
+    if (resCode.equals("")) {
+      resCode = "%";
+    }
+    if (fname.equals("")) {
+      fname = "%";
+    }
+    if (lname.equals("")) {
+      lname = "%";
+    }
+    if (room.equals("")) {
+      room = "%";
+    }
+    ResultSet rs;
+    if (firstDate.equals("") && lastDate.equals("")) {
+      pstmtNoDates.setString(1, fname);
+      pstmtNoDates.setString(2, lname);
+      pstmtNoDates.setString(3, room);
+      pstmtNoDates.setString(4, resCode);
+      rs = pstmtNoDates.executeQuery();
+    } else if (firstDate.equals("")) {
+      pstmtRightBoundOnly.setString(1, fname);
+      pstmtRightBoundOnly.setString(2, lname);
+      pstmtRightBoundOnly.setString(3, room);
+      pstmtRightBoundOnly.setString(4, resCode);
+      pstmtRightBoundOnly.setDate(5, java.sql.Date.valueOf(lastDate));
+      pstmtRightBoundOnly.setDate(6, java.sql.Date.valueOf(lastDate));
+      rs = pstmtRightBoundOnly.executeQuery();
+    } else if (lastDate.equals("")) {
+      pstmtLeftBoundOnly.setString(1, fname);
+      pstmtLeftBoundOnly.setString(2, lname);
+      pstmtLeftBoundOnly.setString(3, room);
+      pstmtLeftBoundOnly.setString(4, resCode);
+      pstmtLeftBoundOnly.setDate(5, java.sql.Date.valueOf(firstDate));
+      pstmtLeftBoundOnly.setDate(6, java.sql.Date.valueOf(firstDate));
+      rs = pstmtLeftBoundOnly.executeQuery();
+    } else {
+      pstmt.setString(1, fname);
+      pstmt.setString(2, lname);
+      pstmt.setString(3, room);
+      pstmt.setString(4, resCode);
+      pstmt.setDate(5, java.sql.Date.valueOf(firstDate));
+      pstmt.setDate(6, java.sql.Date.valueOf(lastDate));
+      pstmt.setDate(7, java.sql.Date.valueOf(firstDate));
+      pstmt.setDate(8, java.sql.Date.valueOf(lastDate));
+      rs = pstmt.executeQuery();
+    }
+    while (rs.next()) {
+      String formatOut =
+        ("Res Code: %s, RoomName: %s, RoomCode: %s, CheckIn: %s, CheckOut: %s, Rate: %s, LastName: %s, FirstName: %s, " +
+          "Adults: %s, Kids: %s").formatted(rs.getString("CODE"), rs.getString("RoomName"), rs.getString("Room"),
+          rs.getString("CheckIn"), rs.getString("CheckOut"), rs.getString("Rate"), rs.getString("LastName"),
+          rs.getString("FirstName"), rs.getString("Adults"), rs.getString("Kids"));
+      System.out.println(formatOut);
+    }
+  }
+
   public static void main(String[] args) throws SQLException {
     try{
       Class.forName("com.mysql.cj.jdbc.Driver");
@@ -477,7 +578,7 @@ public class InnReservations {
         try (var reader = new BufferedReader(new InputStreamReader(System.in))) {
           System.out.println("CSC 365 Lab 7\nBy Fin and Sam\n");
 
-          System.out.println("""
+          String menu = """
             Enter a number
             1: Rooms and Reservations
             2: Reservations
@@ -486,7 +587,8 @@ public class InnReservations {
             5: Detailed Reservation Information
             6: Revenue
             0: Exit
-            """);
+            """;
+          System.out.println(menu);
           String response = getResponse(reader);
           while (response.charAt(0) != '0') {
 
@@ -504,12 +606,13 @@ public class InnReservations {
                 deleteReservation(reader);
                 break;
               case '5':
+                detailedResInformation(conn, new Scanner(System.in));
                 break;
               case '6':
                 showRevenue();
                 break;
             }
-            System.out.println("Main Menu.");
+            System.out.println(menu);
             response = getResponse(reader);
           }
         } catch (IOException e) {
