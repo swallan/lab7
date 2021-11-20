@@ -29,7 +29,7 @@ public class InnReservations {
   public static final String HP_JDBC_PW = "HP_JDBC_PW";
   public static final String NO_CHANGE = "no change";
 
-  private static void bookReservation(BufferedReader reader) throws SQLException {
+  private static void bookReservation(BufferedReader reader) throws SQLException, IOException {
     /*
     When this option is selected, your system shall accept from the user the
     following information:
@@ -101,8 +101,17 @@ public class InnReservations {
             df.format(checkin),
             df.format(checkout),
             rDetails.nadults + rDetails.nchildren);
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        try (PreparedStatement preparedStatement = conn.prepareStatement("""
+          select * from lab7_rooms as rm where RoomCode not in 
+          (select Room from lab7_reservations as rv where (CheckIn between ? and  ? or Checkout between ? and ?))
+          and maxOcc >= (?)""")) {
+
+          preparedStatement.setString(1,  df.format(checkin));
+          preparedStatement.setString(2,  df.format(checkout));
+          preparedStatement.setString(3,  df.format(checkin));
+          preparedStatement.setString(4,  df.format(checkout));
+          preparedStatement.setInt(5, rDetails.nadults + rDetails.nchildren);
+          ResultSet rs = preparedStatement.executeQuery();
           while (rs.next() && rooms.size() < 5) {
             rooms.add(String.format("%s | %s from %s to %s",rs.getString("roomCode"), rs.getString("roomName"), df.format(checkin), df.format(checkout)));
           }
@@ -162,10 +171,19 @@ public class InnReservations {
       }
       String input = getResponse(reader);
       if (input.equals("C")) {
-        String sql = String.format("insert into lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids) VALUES  (%s, '%s','%s','%s', %s, '%s', '%s', %s, %s)", newCode, code, rDetails.checkin, rDetails.checkout, basePrice, rDetails.firstName, rDetails.lastName, rDetails.nadults, rDetails.nchildren);
-        try (Statement stmt = conn.createStatement()
+        try (PreparedStatement stmt = conn.prepareStatement("insert into lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids) VALUES  (?, ?,?,?,?, ?, ?, ?, ?)")
         ) {
-          int rs = stmt.executeUpdate(sql);
+          stmt.setLong(1, newCode);
+          stmt.setString(2, code);
+          stmt.setString(3, rDetails.checkin);
+          stmt.setString(4, rDetails.checkout);
+          stmt.setLong(5, basePrice);
+          stmt.setString(6, rDetails.firstName);
+          stmt.setString(7, rDetails.lastName);
+          stmt.setLong(8, rDetails.nadults);
+          stmt.setLong(9, rDetails.nchildren);
+
+          int rs = stmt.executeUpdate();
         }
         System.out.println("Thank you for booking.");
         System.out.print(String.format("Your reservation code is: <%s>", newCode));
@@ -185,30 +203,31 @@ public class InnReservations {
       if (rDetails.bedType.equals("Any")) {
         bedTypeSql = "";
       } else {
-        bedTypeSql = String.format("and bedType = %s", rDetails.bedType);
+        bedTypeSql = String.format("and bedType = '%s'", rDetails.bedType);
       }
 
       String roomCode;
       if (rDetails.roomCode.equals("Any")) {
         roomCode = "";
       } else {
-        roomCode =  String.format("and roomCode = %s", rDetails.roomCode);
+        roomCode =  String.format("and roomCode = '%s'", rDetails.roomCode);
       }
 
       String baseQuery = String.format("""
           select * from lab7_rooms as rm where RoomCode not in 
-          (select Room from lab7_reservations as rv where (CheckIn between '%s' and '%s' or Checkout between '%s' and '%s'))
-          and maxOcc >= (%s) %s %s""",
-          rDetails.checkin,
-          rDetails.checkout,
-          rDetails.checkin,
-          rDetails.checkout,
-          rDetails.nadults + rDetails.nchildren,
+          (select Room from lab7_reservations as rv where (CheckIn between ? and ? or Checkout between ? and ?))
+          and maxOcc >= (?) %s %s""",
           roomCode,
           bedTypeSql);
 
-      try (Statement stmt = conn.createStatement();
-           ResultSet rs = stmt.executeQuery(baseQuery)) {
+      try (PreparedStatement stmt = conn.prepareStatement(baseQuery);
+           ) {
+        stmt.setString(1, rDetails.checkin);
+        stmt.setString(2, rDetails.checkin);
+        stmt.setString(3, rDetails.checkin);
+        stmt.setString(4, rDetails.checkout);
+        stmt.setLong(5, rDetails.nadults + rDetails.nchildren);
+        ResultSet rs = stmt.executeQuery();
         while (rs.next()) {
           rooms.add(new Room(rs.getString(ROOM_CODE), rs.getString(ROOM_NAME)));
         }
@@ -218,25 +237,25 @@ public class InnReservations {
   }
 
 
-  private static ReservationDetails takeReservationDetails(BufferedReader s) {
-     return new ReservationDetails("firstName", "lastName", "Any",
-         "Any", "2021-10-20", "2021-12-25", 1, 1);
+  private static ReservationDetails takeReservationDetails(BufferedReader s) throws IOException {
+     return new ReservationDetails("firstName", "lastName", "HBB",
+         "Queen", "2021-10-20", "2021-12-25", 1, 1);
 //   System.out.println("Input first name");
-//   String firstName = s.nextLine();
+//   String firstName = s.readLine();
 //   System.out.println("Input last name");
-//   String lastName = s.nextLine();
+//   String lastName = s.readLine();
 //   System.out.println("Input room code if preference, else 'Any'");
-//   String roomCode = s.nextLine();
+//   String roomCode = s.readLine();
 //   System.out.println("Input bed type if preference, else 'Any'");
-//   String bedType = s.nextLine();
+//   String bedType = s.readLine();
 //   System.out.println("Input checkin date (mm-dd-yyyy)");
-//   String checkin = s.nextLine();
+//   String checkin = s.readLine();
 //   System.out.println("Input checkout date (mm-dd-yyyy)");
-//   String checkout = s.nextLine();
+//   String checkout = s.readLine();
 //   System.out.println("Input count children (1, 2, ...)");
-//   int nchildren = Integer.parseInt(s.nextLine());
+//   int nchildren = Integer.parseInt(s.readLine());
 //   System.out.println("Input count adults (1, 2, ...)");
-//   int nadults = Integer.parseInt(s.nextLine());
+//   int nadults = Integer.parseInt(s.readLine());
 //   return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
   }
 
@@ -454,10 +473,10 @@ public class InnReservations {
                 roomsAndReservations(stmt);
                 break;
               case '2':
-                changeReservation(conn,new Scanner(System.in));
-
+                bookReservation(reader);
                 break;
               case '3':
+                changeReservation(conn,new Scanner(System.in));
                 break;
               case '4':
                 deleteReservation(reader);
