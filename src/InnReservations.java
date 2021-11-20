@@ -11,7 +11,10 @@ import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 import java.sql.*;
@@ -26,7 +29,7 @@ public class InnReservations {
   public static final String HP_JDBC_PW = "HP_JDBC_PW";
   public static final String NO_CHANGE = "no change";
 
-  private static void bookReservation(BufferedReader reader) throws SQLException {
+  private static void bookReservation(BufferedReader reader) throws SQLException, IOException {
     /*
     When this option is selected, your system shall accept from the user the
     following information:
@@ -98,8 +101,17 @@ public class InnReservations {
             df.format(checkin),
             df.format(checkout),
             rDetails.nadults + rDetails.nchildren);
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        try (PreparedStatement preparedStatement = conn.prepareStatement("""
+          select * from lab7_rooms as rm where RoomCode not in 
+          (select Room from lab7_reservations as rv where (CheckIn between ? and  ? or Checkout between ? and ?))
+          and maxOcc >= (?)""")) {
+
+          preparedStatement.setString(1,  df.format(checkin));
+          preparedStatement.setString(2,  df.format(checkout));
+          preparedStatement.setString(3,  df.format(checkin));
+          preparedStatement.setString(4,  df.format(checkout));
+          preparedStatement.setInt(5, rDetails.nadults + rDetails.nchildren);
+          ResultSet rs = preparedStatement.executeQuery();
           while (rs.next() && rooms.size() < 5) {
             rooms.add(String.format("%s | %s from %s to %s",rs.getString("roomCode"), rs.getString("roomName"), df.format(checkin), df.format(checkout)));
           }
@@ -159,10 +171,19 @@ public class InnReservations {
       }
       String input = getResponse(reader);
       if (input.equals("C")) {
-        String sql = String.format("insert into lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids) VALUES  (%s, '%s','%s','%s', %s, '%s', '%s', %s, %s)", newCode, code, rDetails.checkin, rDetails.checkout, basePrice, rDetails.firstName, rDetails.lastName, rDetails.nadults, rDetails.nchildren);
-        try (Statement stmt = conn.createStatement()
+        try (PreparedStatement stmt = conn.prepareStatement("insert into lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids) VALUES  (?, ?,?,?,?, ?, ?, ?, ?)")
         ) {
-          int rs = stmt.executeUpdate(sql);
+          stmt.setLong(1, newCode);
+          stmt.setString(2, code);
+          stmt.setString(3, rDetails.checkin);
+          stmt.setString(4, rDetails.checkout);
+          stmt.setLong(5, basePrice);
+          stmt.setString(6, rDetails.firstName);
+          stmt.setString(7, rDetails.lastName);
+          stmt.setLong(8, rDetails.nadults);
+          stmt.setLong(9, rDetails.nchildren);
+
+          int rs = stmt.executeUpdate();
         }
         System.out.println("Thank you for booking.");
         System.out.print(String.format("Your reservation code is: <%s>", newCode));
@@ -178,34 +199,31 @@ public class InnReservations {
         System.getenv(HP_JDBC_USER),
         System.getenv(HP_JDBC_PW))) {
 
-      String bedTypeSql;
-      if (rDetails.bedType.equals("Any")) {
-        bedTypeSql = "";
-      } else {
-        bedTypeSql = String.format("and bedType = %s", rDetails.bedType);
-      }
 
-      String roomCode;
-      if (rDetails.roomCode.equals("Any")) {
-        roomCode = "";
-      } else {
-        roomCode =  String.format("and roomCode = %s", rDetails.roomCode);
-      }
 
-      String baseQuery = String.format("""
+
+      try (PreparedStatement stmt = conn.prepareStatement("""
           select * from lab7_rooms as rm where RoomCode not in 
-          (select Room from lab7_reservations as rv where (CheckIn between '%s' and '%s' or Checkout between '%s' and '%s'))
-          and maxOcc >= (%s) %s %s""",
-          rDetails.checkin,
-          rDetails.checkout,
-          rDetails.checkin,
-          rDetails.checkout,
-          rDetails.nadults + rDetails.nchildren,
-          roomCode,
-          bedTypeSql);
+          (select Room from lab7_reservations as rv where (CheckIn between ? and ? or Checkout between ? and ?))
+          and maxOcc >= (?) and roomCode like ? and bedType like ?""");
+           ) {
+        stmt.setString(1, rDetails.checkin);
+        stmt.setString(2, rDetails.checkin);
+        stmt.setString(3, rDetails.checkin);
+        stmt.setString(4, rDetails.checkout);
+        stmt.setLong(5, rDetails.nadults + rDetails.nchildren);
+        if (rDetails.bedType.equals("Any")) {
+          stmt.setString(6, "%");
+        } else {
+          stmt.setString(6, rDetails.bedType);
+        }
 
-      try (Statement stmt = conn.createStatement();
-           ResultSet rs = stmt.executeQuery(baseQuery)) {
+        if (rDetails.roomCode.equals("Any")) {
+          stmt.setString(7, "%");
+        } else {
+          stmt.setString(7, rDetails.roomCode);
+        }
+        ResultSet rs = stmt.executeQuery();
         while (rs.next()) {
           rooms.add(new Room(rs.getString(ROOM_CODE), rs.getString(ROOM_NAME)));
         }
@@ -215,26 +233,26 @@ public class InnReservations {
   }
 
 
-  private static ReservationDetails takeReservationDetails(BufferedReader s) {
-     return new ReservationDetails("firstName", "lastName", "Any",
-         "Any", "2021-10-20", "2021-10-25", 1, 1);
-//   System.out.println("Input first name");
-//   String firstName = s.nextLine();
-//   System.out.println("Input last name");
-//   String lastName = s.nextLine();
-//   System.out.println("Input room code if preference, else 'Any'");
-//   String roomCode = s.nextLine();
-//   System.out.println("Input bed type if preference, else 'Any'");
-//   String bedType = s.nextLine();
-//   System.out.println("Input checkin date (mm-dd-yyyy)");
-//   String checkin = s.nextLine();
-//   System.out.println("Input checkout date (mm-dd-yyyy)");
-//   String checkout = s.nextLine();
-//   System.out.println("Input count children (1, 2, ...)");
-//   int nchildren = Integer.parseInt(s.nextLine());
-//   System.out.println("Input count adults (1, 2, ...)");
-//   int nadults = Integer.parseInt(s.nextLine());
-//   return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
+  private static ReservationDetails takeReservationDetails(BufferedReader s) throws IOException {
+//     return new ReservationDetails("firstName", "lastName", "HBB",
+//         "Queen", "2021-10-20", "2021-12-25", 1, 1);
+   System.out.println("Input first name");
+   String firstName = s.readLine();
+   System.out.println("Input last name");
+   String lastName = s.readLine();
+   System.out.println("Input room code if preference, else 'Any'");
+   String roomCode = s.readLine();
+   System.out.println("Input bed type if preference, else 'Any'");
+   String bedType = s.readLine();
+   System.out.println("Input checkin date (mm-dd-yyyy)");
+   String checkin = s.readLine();
+   System.out.println("Input checkout date (mm-dd-yyyy)");
+   String checkout = s.readLine();
+   System.out.println("Input count children (1, 2, ...)");
+   int nchildren = Integer.parseInt(s.readLine());
+   System.out.println("Input count adults (1, 2, ...)");
+   int nadults = Integer.parseInt(s.readLine());
+   return new ReservationDetails(firstName, lastName, roomCode, bedType, checkin, checkout, nchildren, nadults);
   }
 
   private static void changeReservation(Connection conn, Scanner s) throws SQLException {
@@ -517,6 +535,25 @@ public class InnReservations {
             FOREIGN KEY (Room) REFERENCES swallan.lab7_rooms (RoomCode)
             );
           """;
+
+        List<String> createMonthsTables = List.of("drop table if exists swallan.months;",
+            """
+            CREATE TABLE IF NOT EXISTS swallan.months
+            (
+                m int PRIMARY KEY
+            );""",
+            "insert into months VALUE (1);",
+            "insert into months VALUE (2);",
+            "insert into months VALUE (3);",
+            "insert into months VALUE (4);",
+            "insert into months VALUE (5);",
+            "insert into months VALUE (6);",
+            "insert into months VALUE (7);",
+            "insert into months VALUE (8);",
+            "insert into months VALUE (9);",
+            "insert into months VALUE (10);",
+            "insert into months VALUE (11);",
+            "insert into months VALUE (12);");
         // It errors cuz of duplicate keys so only need this if we need to reset the tables
 //        String insertRooms = "INSERT INTO swallan.lab7_rooms SELECT * FROM INN.rooms;";
 //        String insertReservations =
@@ -526,10 +563,17 @@ public class InnReservations {
 //          DATE_ADD(Checkout, INTERVAL 132 MONTH),
 //          Rate, LastName, FirstName, Adults, Kids FROM INN.reservations;
 //          """;
+      try (Statement stmt = conn.createStatement()) {
+        for (String s : createMonthsTables) {
+          stmt.addBatch(s);
+        }
+        stmt.executeBatch();
+      }
 
       try (Statement stmt = conn.createStatement()) {
         stmt.execute(createRooms);
         stmt.execute(createReservations);
+//        stmt.executeQuery(createMonthsTable);
 
         try (var reader = new BufferedReader(new InputStreamReader(System.in))) {
           System.out.println("CSC 365 Lab 7\nBy Fin and Sam\n");
@@ -553,6 +597,7 @@ public class InnReservations {
                 roomsAndReservations(stmt);
                 break;
               case '2':
+                bookReservation(reader);
                 break;
               case '3':
                 changeReservation(conn,new Scanner(System.in));
@@ -564,6 +609,7 @@ public class InnReservations {
                 detailedResInformation(conn, new Scanner(System.in));
                 break;
               case '6':
+                showRevenue();
                 break;
             }
             System.out.println(menu);
@@ -582,7 +628,67 @@ public class InnReservations {
 
   }
 
-  private static void deleteReservation(BufferedReader reader) throws SQLException {
+  private static void showRevenue() {
+
+    String sql = """
+        with funStuff as (select *,
+               IF(MONTH(CheckIn) = MONTH(Checkout),
+                    DATEDIFF(checkout, checkin), -- just the number of days in the reservation
+                    if (MONTH(CheckOut) <> m and MONTH(Checkin) <> m,
+                        DAY(LAST_DAY(DATE_ADD(MAKEDATE(2008, 7), INTERVAL (m - 1) MONTH))), -- full month
+                        -- partial month
+                        IF(MONTH(checkout) = m,
+                           DAY(checkout),
+                           DAY(LAST_DAY(DATE_ADD(MAKEDATE(2008, 7), INTERVAL (m - 1) MONTH))) +1 - DAY(checkin)
+                          )
+                       )
+                  ) as daysStayed
+                
+        from lab7_reservations join months on (MONTH(CheckIn) <= months.m and MONTH(Checkout) >= months.m)
+        where MONTH(Checkout) <> MONTH(Checkin)
+        order by CODE DESC)
+                
+        select m, sum(daysStayed * rate) as money, room from funStuff
+        group by m, room
+        order by m, room""";
+
+    Map<String, List<Double>> roomsAndRevenues = new HashMap<>();
+    try (Connection conn = DriverManager.getConnection(System.getenv(HP_JDBC_URL),
+        System.getenv(HP_JDBC_USER),
+        System.getenv(HP_JDBC_PW))) {
+      boolean isR = false;
+      try (Statement stmt = conn.createStatement()) {
+        ResultSet rs = stmt.executeQuery(sql);
+        while (rs.next()) {
+          if (roomsAndRevenues.containsKey(rs.getString("room"))) {
+            roomsAndRevenues.get(rs.getString("room")).add(Double.parseDouble(rs.getString("money")));
+          } else {
+            List<Double> temp = new ArrayList<>();
+            temp.add(Double.parseDouble(rs.getString("money")));
+
+            roomsAndRevenues.put(rs.getString("room"), temp);
+          }
+        }
+      }
+      System.out.println("Showing revenue for each room, by month.");
+      for (Map.Entry<String, List<Double>> e : roomsAndRevenues.entrySet()) {
+        System.out.println(String.format("Revenue for room %s", e.getKey()));
+        for (int i = 1; i < 13; i++) {
+          double rev = 0;
+          if (e.getValue().size() > i) {
+            rev = e.getValue().get(i);
+          }
+          System.out.println(String.format("Month %s: %s", i, Math.round(rev)));
+
+        }
+        System.out.println(String.format("Total revenue: %s\n", Math.round(e.getValue().stream().mapToDouble(f -> f.doubleValue()).sum())));
+      }
+    } catch (SQLException throwables) {
+      throwables.printStackTrace();
+    }
+  }
+
+    private static void deleteReservation(BufferedReader reader) throws SQLException {
     System.out.println("Please enter your confirmation code for cancellation.");
     String code = getResponse(reader);
     System.out.println(String.format("Please confirm [C] cancellation for <%s>.\nPress any other key to keep your reservation.", code));
