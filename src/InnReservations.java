@@ -244,9 +244,9 @@ public class InnReservations {
    String roomCode = s.readLine();
    System.out.println("Input bed type if preference, else 'Any'");
    String bedType = s.readLine();
-   System.out.println("Input checkin date (mm-dd-yyyy)");
+   System.out.println("Input checkin date (yyyy-mm-dd)");
    String checkin = s.readLine();
-   System.out.println("Input checkout date (mm-dd-yyyy)");
+   System.out.println("Input checkout date (yyyy-mm-dd)");
    String checkout = s.readLine();
    System.out.println("Input count children (1, 2, ...)");
    int nchildren = Integer.parseInt(s.readLine());
