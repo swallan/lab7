@@ -393,13 +393,18 @@ public class InnReservations {
           }
         }
       }
+      System.out.println("Showing revenue for each room, by month.");
       for (Map.Entry<String, List<Double>> e : roomsAndRevenues.entrySet()) {
         System.out.println(String.format("Revenue for room %s", e.getKey()));
         for (int i = 1; i < 13; i++) {
-          System.out.println(String.format("Month %s: %s", i, e.getValue().get(i)));
+          double rev = 0;
+          if (e.getValue().size() > i) {
+            rev = e.getValue().get(i);
+          }
+          System.out.println(String.format("Month %s: %s", i, Math.round(rev)));
 
         }
-        System.out.println(String.format("Total revenue: %s", e.getValue().stream().mapToDouble(f -> f.doubleValue()).sum()));
+        System.out.println(String.format("Total revenue: %s\n", Math.round(e.getValue().stream().mapToDouble(f -> f.doubleValue()).sum())));
       }
     } catch (SQLException throwables) {
       throwables.printStackTrace();
