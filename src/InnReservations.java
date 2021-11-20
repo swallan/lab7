@@ -93,8 +93,8 @@ public class InnReservations {
         checkin = checkin.plusDays(1);
         checkout = checkout.plusDays(1);
         String sql = String.format("""
-          select * from lab7_rooms as rm where RoomCode not in 
-          (select Room from lab7_reservations as rv where (CheckIn between '%s' and '%s' or Checkout between '%s' and '%s'))
+          select * from swallan.lab7_rooms as rm where RoomCode not in 
+          (select Room from swallan.lab7_reservations as rv where (CheckIn between '%s' and '%s' or Checkout between '%s' and '%s'))
           and maxOcc >= (%s)""",
             df.format(checkin),
             df.format(checkout),
@@ -102,8 +102,8 @@ public class InnReservations {
             df.format(checkout),
             rDetails.nadults + rDetails.nchildren);
         try (PreparedStatement preparedStatement = conn.prepareStatement("""
-          select * from lab7_rooms as rm where RoomCode not in 
-          (select Room from lab7_reservations as rv where (CheckIn between ? and  ? or Checkout between ? and ?))
+          select * from swallan.lab7_rooms as rm where RoomCode not in 
+          (select Room from swallan.lab7_reservations as rv where (CheckIn between ? and  ? or Checkout between ? and ?))
           and maxOcc >= (?)""")) {
 
           preparedStatement.setString(1,  df.format(checkin));
@@ -131,7 +131,7 @@ public class InnReservations {
     try (Connection conn = DriverManager.getConnection(System.getenv(HP_JDBC_URL),
         System.getenv(HP_JDBC_USER),
         System.getenv(HP_JDBC_PW))) {
-      String sql = "select max(maxOcc) as maxOccupancy from lab7_rooms";
+      String sql = "select max(maxOcc) as maxOccupancy from swallan.lab7_rooms";
       try (Statement stmt = conn.createStatement();
            ResultSet rs = stmt.executeQuery(sql)) {
         while (rs.next()) {
@@ -152,7 +152,7 @@ public class InnReservations {
 
       // collect new code for reservation.
       Long newCode = null;
-      String sqlGetNewRNumber = "select (max(CODE) + 1) as newCode from lab7_reservations";
+      String sqlGetNewRNumber = "select (max(CODE) + 1) as newCode from swallan.lab7_reservations";
       try (Statement stmt = conn.createStatement();
            ResultSet rs = stmt.executeQuery(sqlGetNewRNumber)) {
         while (rs.next()) {
@@ -162,7 +162,7 @@ public class InnReservations {
 
       // figure out what the baseprice is.
       Long basePrice = null;
-      String getBasePrice = "select basePrice from lab7_rooms";
+      String getBasePrice = "select basePrice from swallan.lab7_rooms";
       try (Statement stmt = conn.createStatement();
            ResultSet rs = stmt.executeQuery(getBasePrice)) {
         while (rs.next()) {
@@ -171,7 +171,7 @@ public class InnReservations {
       }
       String input = getResponse(reader);
       if (input.equals("C")) {
-        try (PreparedStatement stmt = conn.prepareStatement("insert into lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids) VALUES  (?, ?,?,?,?, ?, ?, ?, ?)")
+        try (PreparedStatement stmt = conn.prepareStatement("insert into swallan.lab7_reservations (CODE, Room, CheckIn, Checkout, Rate, LastName, FirstName, Adults, Kids) VALUES  (?, ?,?,?,?, ?, ?, ?, ?)")
         ) {
           stmt.setLong(1, newCode);
           stmt.setString(2, code);
@@ -203,8 +203,8 @@ public class InnReservations {
 
 
       try (PreparedStatement stmt = conn.prepareStatement("""
-          select * from lab7_rooms as rm where RoomCode not in 
-          (select Room from lab7_reservations as rv where (CheckIn between ? and ? or Checkout between ? and ?))
+          select * from swallan.lab7_rooms as rm where RoomCode not in 
+          (select Room from swallan.lab7_reservations as rv where (CheckIn between ? and ? or Checkout between ? and ?))
           and maxOcc >= (?) and roomCode like ? and bedType like ?""");
            ) {
         stmt.setString(1, rDetails.checkin);
@@ -644,7 +644,7 @@ public class InnReservations {
                        )
                   ) as daysStayed
                 
-        from lab7_reservations join months on (MONTH(CheckIn) <= months.m and MONTH(Checkout) >= months.m)
+        from swallan.lab7_reservations join months on (MONTH(CheckIn) <= months.m and MONTH(Checkout) >= months.m)
         where MONTH(Checkout) <> MONTH(Checkin)
         order by CODE DESC)
                 
@@ -694,8 +694,8 @@ public class InnReservations {
     System.out.println(String.format("Please confirm [C] cancellation for <%s>.\nPress any other key to keep your reservation.", code));
     if (getResponse(reader).equals("C")){
       // cancel reservation
-      String sql = String.format("delete from lab7_reservations where CODE = %s", code);
-      String sql2 = String.format("select * from lab7_reservations where CODE = %s", code);
+      String sql = String.format("delete from swallan.lab7_reservations where CODE = %s", code);
+      String sql2 = String.format("select * from swallan.lab7_reservations where CODE = %s", code);
       try (Connection conn = DriverManager.getConnection(System.getenv(HP_JDBC_URL),
           System.getenv(HP_JDBC_USER),
           System.getenv(HP_JDBC_PW))) {
